@@ -1,20 +1,31 @@
 from __future__ import annotations
-import win32gui, win32con, win32process
+
+import time
+import ctypes
+
+import win32gui
+import win32con
+import win32process
 import psutil
+
 
 class WindowNotFound(Exception):
     pass
 
+
 def _enum_windows():
     out = []
+
     def cb(hwnd, _):
         if not win32gui.IsWindowVisible(hwnd):
             return
         title = win32gui.GetWindowText(hwnd).strip()
         if title:
             out.append((hwnd, title))
+
     win32gui.EnumWindows(cb, None)
     return out
+
 
 def find_window_hwnd(title_contains: str | None = None,
                      process_name: str | None = None) -> int:
@@ -37,13 +48,17 @@ def find_window_hwnd(title_contains: str | None = None,
         wins = filtered
 
     if not wins:
-        raise WindowNotFound(f"No window found for title_contains={title_contains}, process_name={process_name}")
+        raise WindowNotFound(
+            f"No window found for title_contains={title_contains}, process_name={process_name}"
+        )
 
     fg = win32gui.GetForegroundWindow()
     for hwnd, _ in wins:
         if hwnd == fg:
             return hwnd
+
     return wins[0][0]
+
 
 def get_client_bbox(hwnd: int) -> dict:
     l, t, r, b = win32gui.GetClientRect(hwnd)
@@ -53,15 +68,14 @@ def get_client_bbox(hwnd: int) -> dict:
     x2, y2 = br
     return {"left": x1, "top": y1, "width": x2 - x1, "height": y2 - y1}
 
-import time
-import win32gui, win32con, win32process
-import ctypes
 
-def focus_window(hwnd: int, click_fallback: bool = False):
-    # restore if minimized
+def is_alive(hwnd: int) -> bool:
+    return win32gui.IsWindow(hwnd) and win32gui.IsWindowVisible(hwnd)
+
+
+def focus_window(hwnd: int, click_fallback: bool = False) -> bool:
     win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 
-    # try normal foreground
     try:
         win32gui.SetForegroundWindow(hwnd)
         time.sleep(0.05)
@@ -70,7 +84,6 @@ def focus_window(hwnd: int, click_fallback: bool = False):
     except Exception:
         pass
 
-    # stronger method: attach input to foreground thread
     try:
         fg = win32gui.GetForegroundWindow()
         fg_tid = win32process.GetWindowThreadProcessId(fg)[0]
@@ -88,7 +101,6 @@ def focus_window(hwnd: int, click_fallback: bool = False):
     except Exception:
         pass
 
-    # optional fallback: click inside window (most reliable)
     if click_fallback:
         try:
             l, t, r, b = win32gui.GetWindowRect(hwnd)
@@ -103,6 +115,3 @@ def focus_window(hwnd: int, click_fallback: bool = False):
             pass
 
     return False
-
-def is_alive(hwnd: int) -> bool:
-    return win32gui.IsWindow(hwnd) and win32gui.IsWindowVisible(hwnd)
