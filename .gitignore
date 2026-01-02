@@ -10,6 +10,7 @@ __pycache__/
 venv/
 env/
 captures/
+captures_debug/
 
 # Tooling caches
 .pytest_cache/
