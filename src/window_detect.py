@@ -9,6 +9,9 @@ import win32process
 import psutil
 
 
+__all__ = ["WindowNotFound", "find_window_hwnd", "get_client_bbox", "is_alive", "focus_window"]
+
+
 class WindowNotFound(Exception):
     pass
 
@@ -115,3 +118,17 @@ def focus_window(hwnd: int, click_fallback: bool = False) -> bool:
             pass
 
     return False
+
+
+# ✅ Self-test: runs only if you execute `python window_detect.py`
+# and NOT when imported by main.py  :contentReference[oaicite:3]{index=3}
+if __name__ == "__main__":
+    # Example: try to find Zuma window (change title if needed)
+    try:
+        hwnd = find_window_hwnd(title_contains="Zuma", process_name=None)
+        focus_window(hwnd, click_fallback=False)
+        print("Title:", win32gui.GetWindowText(hwnd))
+        print("HWND:", hwnd)
+        print("BBOX:", get_client_bbox(hwnd))
+    except WindowNotFound as e:
+        print("WindowNotFound:", e)
