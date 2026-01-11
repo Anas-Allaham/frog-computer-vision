@@ -4,14 +4,18 @@ from pathlib import Path
 import numpy as np
 import cv2
 import mss
+import sys
 
 from window_detect import find_window_hwnd, get_client_bbox, focus_window, is_alive
 
+sys.path.append(str(Path(__file__).parent))
 
-TITLE = "Zuma Deluxe"
+from config import SCORE_TEMPLATE_PATH, X_TEMPLATE_PATH, CAPTURES_DIR, GAME_TITLE
+
+TITLE = GAME_TITLE
 PROC = None
 
-SAVE_DIR = Path("captures")
+SAVE_DIR = CAPTURES_DIR
 SAVE_DIR.mkdir(exist_ok=True)
 
 SAVE_EVERY_SEC = 1.0
@@ -19,8 +23,8 @@ SAVE_EVERY_SEC = 1.0
 USE_TEMPLATE_CROP = True         
 FALLBACK_SAVE_FULL = False        
 
-SCORE_TEMPLATE = Path("templates/score.png")
-X_TEMPLATE = Path("templates/x.png")
+SCORE_TEMPLATE = SCORE_TEMPLATE_PATH
+X_TEMPLATE = X_TEMPLATE_PATH
 
 MATCH_THRESH = 0.65
 SCALES = (0.5 , 0.6,0.7 , 0.8, 0.90, 0.95, 1.0, 1.05, 1.10, 1.15)
