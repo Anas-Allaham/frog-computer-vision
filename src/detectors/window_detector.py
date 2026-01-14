@@ -2,6 +2,7 @@ import cv2 as cv
 import numpy as np
 from .template_matcher import TemplateMatcher
 
+
 class ZumaWindowDetector:
     def __init__(
         self,
@@ -12,31 +13,34 @@ class ZumaWindowDetector:
         fullscreen_ratio=0.80,
         title_threshold=0.65,
         debug=False,
+        scale=1.0,
     ):
-        self.min_area = min_area
-        self.adaptive_block = adaptive_block
+        self.scale = scale
+        self.debug = debug
+
+        self.min_area = int(min_area * scale * scale)
+        self.adaptive_block = max(11, int(adaptive_block * scale) | 1)
         self.adaptive_c = adaptive_c
         self.fullscreen_ratio = fullscreen_ratio
         self.title_threshold = title_threshold
-        self.debug = debug
 
         self.vertical_kernel = cv.getStructuringElement(
-            cv.MORPH_RECT, (9, 1)
+            cv.MORPH_RECT,
+            (max(3, int(9 * scale)), 1)
         )
         self.cleanup_kernel = cv.getStructuringElement(
-            cv.MORPH_RECT, (3, 3)
+            cv.MORPH_RECT,
+            (max(3, int(3 * scale)), max(3, int(3 * scale)))
         )
 
-        # ---- Title matcher (helper only) ----
         self.matcher = TemplateMatcher(
             template_path=template_path,
             threshold=title_threshold,
             debug=debug,
         )
 
-    # ============================================================
-    # Helper: find title anchor Y
-    # ============================================================
+    # --------------------------------------------------
+
     def find_anchor_y(self, img):
         ok, score, scale, loc = self.matcher.match(img)
         if not ok or loc is None:
@@ -44,18 +48,10 @@ class ZumaWindowDetector:
 
         _, tmpl = self.matcher.templates[0]
         h = int(tmpl.shape[0] * scale)
-        x, y = loc
+        return loc[1] + h
 
-        anchor_y = y + h
+    # --------------------------------------------------
 
-        if self.debug:
-            print(f"[ANCHOR] Found at y={anchor_y}, score={score:.3f}")
-
-        return anchor_y
-
-    # ============================================================
-    # Window candidate detection
-    # ============================================================
     def _detect_windows(self, img):
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         h, w = gray.shape
@@ -63,8 +59,7 @@ class ZumaWindowDetector:
 
         sobel_x = cv.Sobel(gray, cv.CV_64F, 1, 0, 3)
         sobel_y = cv.Sobel(gray, cv.CV_64F, 0, 1, 3)
-        mag = cv.magnitude(sobel_x, sobel_y)
-        mag = np.uint8(np.clip(mag, 0, 255))
+        mag = np.uint8(np.clip(cv.magnitude(sobel_x, sobel_y), 0, 255))
 
         edges = cv.adaptiveThreshold(
             mag,
@@ -77,21 +72,15 @@ class ZumaWindowDetector:
         edges = cv.bitwise_not(edges)
 
         edges = cv.morphologyEx(edges, cv.MORPH_OPEN, self.vertical_kernel)
-        edges = cv.morphologyEx(
-            edges, cv.MORPH_OPEN, self.cleanup_kernel, iterations=3
-        )
+        edges = cv.morphologyEx(edges, cv.MORPH_OPEN, self.cleanup_kernel, iterations=3)
 
-        contours, _ = cv.findContours(
-            edges, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE
-        )
+        contours, _ = cv.findContours(edges, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
         windows = []
         fullscreen = None
 
         for cnt in contours:
-            peri = cv.arcLength(cnt, True)
-            approx = cv.approxPolyDP(cnt, 0.02 * peri, True)
-
+            approx = cv.approxPolyDP(cnt, 0.02 * cv.arcLength(cnt, True), True)
             if not cv.isContourConvex(approx):
                 continue
 
@@ -105,83 +94,44 @@ class ZumaWindowDetector:
             if cv.contourArea(cnt) >= self.min_area and len(approx) == 4:
                 windows.append(approx)
 
-        if fullscreen is not None:
-            return [fullscreen], edges
+        return ([fullscreen] if fullscreen is not None else windows), edges
 
-        return windows, edges
+    # --------------------------------------------------
 
-    # ============================================================
-    # Public API
-    # ============================================================
     def detect(self, img):
-        if img is None:
-            raise ValueError("Input image is None")
-
         windows, edges = self._detect_windows(img)
-
-        if self.debug:
-            print(f"[ZUMA] Candidate windows: {len(windows)}")
-
-        # ------------------------------------------------
-        # 1. Try title anchor (windowed mode)
-        # ------------------------------------------------
         anchor_y = self.find_anchor_y(img)
 
+        best = None
+
         if anchor_y is not None and windows:
-            best = None
-            best_dist = float("inf")
-
-            for rect in windows:
-                x, y, w, h = cv.boundingRect(rect)
-
-                if y >= anchor_y - 20:  # tolerance
-                    dist = y - anchor_y
-                    if dist < best_dist:
-                        best_dist = dist
-                        best = rect
-
-            if best is not None:
-                if self.debug:
-                    print("[ZUMA] Selected window by title anchor")
-                return best, edges
-
-            if self.debug:
-                print("[ZUMA] Anchor found but no window below it")
-
-        # ------------------------------------------------
-        # 2. FULLSCREEN / FALLBACK (always executed)
-        # ------------------------------------------------
-        if windows:
+            best = min(
+                windows,
+                key=lambda r: abs(cv.boundingRect(r)[1] - anchor_y),
+            )
+        elif windows:
             best = max(
                 windows,
-                key=lambda r: cv.boundingRect(r)[2] * cv.boundingRect(r)[3]
+                key=lambda r: cv.boundingRect(r)[2] * cv.boundingRect(r)[3],
             )
 
-            if self.debug:
-                x, y, w, h = cv.boundingRect(best)
-                print(f"[ZUMA] Fallback to largest window ({w}x{h})")
+        if best is None:
+            h, w = img.shape[:2]
+            best = np.array([
+                [[0, 0]],
+                [[w - 1, 0]],
+                [[w - 1, h - 1]],
+                [[0, h - 1]],
+            ])
 
-            return best, edges
+        # --- SCALE back and convert to x, y, w, h tuple ---
+        best_scaled = (best / self.scale).astype(np.int32)
+        x, y, w, h = cv.boundingRect(best_scaled)
 
-        # ------------------------------------------------
-        # 3. Ultimate fallback: whole screen
-        # ------------------------------------------------
-        h, w = img.shape[:2]
-        fullscreen = np.array([
-            [[0, 0]],
-            [[w - 1, 0]],
-            [[w - 1, h - 1]],
-            [[0, h - 1]],
-        ])
+        return (x, y, w, h), edges
 
-        if self.debug:
-            print("[ZUMA] Ultimate fallback: full image")
+    # --------------------------------------------------
 
-        return fullscreen, edges
-
-    # ============================================================
-    # Draw helper
-    # ============================================================
     @staticmethod
     def draw(img, rect, color=(0, 255, 0), thickness=3):
         out = img.copy()
