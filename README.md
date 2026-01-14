@@ -41,10 +41,25 @@ This avoids OCR, works in fullscreen and windowed modes, and guarantees **exactl
 ---
 
 ## Project Structure
-    img/
-    ├── tests/        # Input screenshots\n"
-    ├── templates/    # Zuma title template(s)\n"
-    └── outputs/      # Detection results\n"
+    ├── img
+    │ ├── outputs
+    │ ├── templates
+    │ └── tests
+    ├── README.md
+    ├── requirements.txt
+    └── src
+        ├── config.py
+        ├── cv_helper
+        │ ├── image_reader.py
+        │ ├── image_viewer.py
+        │ ├── __init__.py
+        │ └── utils.py
+        ├── detectors
+        │ ├── balls_detectors.py
+        │ ├── template_matcher.py
+        │ ├── window_detector.py
+        │ └── zuma_frog_detector.py
+        └──  main.py
 ---
 
 ## Run
