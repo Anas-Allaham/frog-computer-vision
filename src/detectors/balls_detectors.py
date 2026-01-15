@@ -23,7 +23,6 @@ class ZumaBallDetector:
             "orange": (0, 140, 255),
             "purple": (200, 0, 150),
         }
-
         self.color_names = list(self.colors_bgr.keys())
         self.target_values = list(self.colors_bgr.values())
 

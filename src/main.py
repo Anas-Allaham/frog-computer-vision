@@ -88,11 +88,10 @@ def main():
     ball_detector = ZumaBallDetector(debug=DEBUG)
 
     print("Select mode:")
-    print("  4 - Real-time Screen Capture")
-    choice = input("Enter choice (1-4): ").strip()
+    print("Real-time Screen Capture")
+    input("Press Enter: ").strip()
 
-    if choice == "4":
-        test_realtime_threaded(window_detector, ball_detector)
+    test_realtime_threaded(window_detector, ball_detector)
 
 
 if __name__ == "__main__":

@@ -3,22 +3,6 @@ import cv2 as cv
 import numpy as np
 import mss
 
-class SharedData:
-    """Thread-safe container for any data (window rect, balls, etc.)"""
-
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.data = None
-
-    def set(self, value):
-        with self.lock:
-            self.data = value
-
-    def get(self):
-        with self.lock:
-            return self.data
-
-
 # =======================
 # THREAD-SAFE CONTAINER
 # =======================
