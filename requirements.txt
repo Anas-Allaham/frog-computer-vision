@@ -1,4 +1,6 @@
 opencv-python
+mss
+pyautogui
 numpy
 mss
 scipy

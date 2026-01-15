@@ -2,6 +2,7 @@ import threading
 import cv2 as cv
 import numpy as np
 import mss
+import time
 
 class SharedData:
     """Thread-safe container for any data (window rect, balls, etc.)"""
@@ -53,17 +54,27 @@ class CaptureThread(threading.Thread):
         super().__init__(daemon=True)
         self.monitor = monitor
         self.frame = SharedFrame()
-        self.running = True
-
+        self.stopped = False
     def update_roi(self, new_monitor):
         self.monitor = new_monitor
 
-    def run(self):
-        with mss.mss() as sct:
-            while self.running:
-                img = np.array(sct.grab(self.monitor))
-                frame = cv.cvtColor(img, cv.COLOR_BGRA2BGR)
-                self.frame.set(frame)
-
     def stop(self):
-        self.running = False
+        self.stopped = True
+
+    def run(self):
+        # Leave a 250px high safe zone at the top of the screen for the debug window
+        safe_zone_height = 250
+        capture_monitor = {
+            "top": self.monitor["top"] + safe_zone_height,
+            "left": self.monitor["left"],
+            "width": self.monitor["width"],
+            "height": self.monitor["height"] - safe_zone_height,
+        }
+
+        with mss.mss() as sct:
+            while not self.stopped:
+                screenshot = sct.grab(capture_monitor)
+                img = np.array(screenshot)
+                img = cv.cvtColor(img, cv.COLOR_BGRA2BGR)
+                self.frame.set(img)
+                time.sleep(0.01) # Avoid busy-waiting

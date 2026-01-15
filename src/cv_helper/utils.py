@@ -32,3 +32,22 @@ def apply_clahe_lab(lab, clip=2.0, grid=(8, 8)):
 
     l_clahe = clahe.apply(l)
     return cv.merge((l_clahe, a, b))
+
+def crop_image(img, rect):
+    """
+    Safely crops an image using a bounding rectangle (x, y, w, h).
+    Handles cases where the rectangle is outside the image boundaries.
+    """
+    x, y, w, h = rect
+    h_img, w_img = img.shape[:2]
+
+    # Clamp coordinates to be within the image dimensions
+    x1 = max(0, x)
+    y1 = max(0, y)
+    x2 = min(w_img, x + w)
+    y2 = min(h_img, y + h)
+
+    if x1 >= x2 or y1 >= y2:
+        return None  # Return None if the ROI is completely outside the image
+
+    return img[y1:y2, x1:x2]
